@@ -1,4 +1,5 @@
 cluster:
+  mkdir -p logs/{rule}/ &&
   sbatch
     --cpus-per-task={threads}
     --mem={resources.mem_mb}
@@ -6,12 +7,16 @@ cluster:
     --job-name=klaudia-{rule}
     --ntasks={resources.nodes}
     --nodes={resources.nodes}
-    --partition=production
+    --output=logs/{rule}/{jobid}.out
+    --error=logs/{rule}/{jobid}.err
+    --partition={resources.partition}
+    --account={resources.account}
     --parsable
 default-resources:
-  - mem_mb=20000
-  - time=2880
-  - partition=production
+  - mem_mb=2000
+  - time=60
+  - account=lasallegrp
+  - partition=high
   - threads=1
   - nodes=1
 jobs: 50
@@ -25,6 +30,6 @@ rerun-incomplete: True
 printshellcmds: True
 scheduler: greedy
 use-conda: True
-conda-prefix: /share/korflab/home/viki/anaconda3/
+conda-prefix: /quobyte/lasallegrp/programs/.conda/
 conda-frontend: conda
 cluster-status: 00_slurm/slurm-status.py

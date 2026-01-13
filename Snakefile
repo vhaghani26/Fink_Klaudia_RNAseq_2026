@@ -10,10 +10,10 @@ rule all:
         "04_multiqc/multiqc_report.html",
         "05_gene_counts/counts.txt"
 
-#######################################
-## Genome Preparation (from Scratch) ##
-#######################################
-'''
+########################
+## Genome Preparation ##
+########################
+
 rule download_hg38_genes:
     output: "01_Genomes/hg38/hg38.ncbiRefSeq.gtf.gz"
     log: "00_logs/download_hg38_genes.log"
@@ -81,60 +81,12 @@ rule zip_annot:
         indexers6 = "01_Genomes/hg38/STAR_indexed_hg38/genomeParameters.txt",
         indexers7 = "01_Genomes/hg38/STAR_indexed_hg38/SA",
         indexers8 = "01_Genomes/hg38/STAR_indexed_hg38/SAindex",
-    output: "01_Genomes/hg38/hg38.ncbiRefSeq.gtf.gz"
     log: "00_logs/zip_annotation_genes.log"
-    shell: "gzip {input.unzipped} > {output} 2> {log}"
-''' 
-########################################
-## Genome Preparation (from Fink Lab) ##
-########################################
-
-rule link_genome:
-    message: "Linking hg38 genome FASTA file"
-    input: "/share/finklab/genomes/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-    output: "01_Genomes/hg38/STAR_indexed_hg38/hg38.fa"
-    shell: "ln -sf {input} {output}"
-
-rule link_indexed_genome:
-    message: "Linking STAR indexed genome"
-    input:
-        STAR_dir = "/share/finklab/genomes/GRCh38/star_150",
-        fasta_file = "01_Genomes/hg38/STAR_indexed_hg38/hg38.fa"
-    output: 
-        indexers1 = "01_Genomes/hg38/STAR_indexed_hg38/chrLength.txt",
-        indexers2 = "01_Genomes/hg38/STAR_indexed_hg38/chrNameLength.txt",
-        indexers3 = "01_Genomes/hg38/STAR_indexed_hg38/chrName.txt",
-        indexers4 = "01_Genomes/hg38/STAR_indexed_hg38/chrStart.txt",
-        indexers5 = "01_Genomes/hg38/STAR_indexed_hg38/Genome",
-        indexers6 = "01_Genomes/hg38/STAR_indexed_hg38/genomeParameters.txt",
-        indexers7 = "01_Genomes/hg38/STAR_indexed_hg38/SA",
-        indexers8 = "01_Genomes/hg38/STAR_indexed_hg38/SAindex",
-    shell: "ln -sf {input.STAR_dir}/* 01_Genomes/hg38/STAR_indexed_hg38/"
+    shell: "gzip {input.unzipped} 2> {log}"
         
 ######################
 ## Read Preparation ##
 ######################
-
-rule format_reads:
-    message: "Preparing to format reads"
-    log: "00_logs/format_reads.log"
-    output: 
-        forward_read = expand("01_raw_sequences/{sample}_1.fastq.gz", sample=config["samples"]),
-        reverse_read = expand("01_raw_sequences/{sample}_2.fastq.gz", sample=config["samples"])
-    shell: "python3 scripts/format_reads.py 2> {log}"
-
-rule trim:
-    message: "Trimming samples"
-    input:
-        r1 = "01_raw_sequences/{sample}_1.fastq.gz",
-        r2 = "01_raw_sequences/{sample}_2.fastq.gz",
-    output:
-        out1 = temp("02_trimmed/{sample}_1.fastq.gz_trimming_report.txt"),
-        out2 = temp("02_trimmed/{sample}_1_val_1.fq.gz"),
-        out3 = temp("02_trimmed/{sample}_2.fastq.gz_trimming_report.txt"),
-        out4 = temp("02_trimmed/{sample}_2_val_2.fq.gz")
-    log: "00_logs/02_trimmed_{sample}.log"
-    shell: "trim_galore --paired --cores 6 --2colour 20 --fastqc --clip_r1 10 --clip_r2 20 --three_prime_clip_r1 10 --three_prime_clip_r2 10 --output_dir 02_trimmed/ {input.r1} {input.r2} 2> {log}"
     
 rule align_reads:
     input:
@@ -162,19 +114,11 @@ rule bam_index:
     output: "03_bam_files/{sample}_Aligned.sortedByCoord.out.bam.bai"
     log: "00_logs/{sample}_bam_index.log"
     shell: "samtools index -@ THREADS '{input}' 2> '{log}'"
-
-rule alignment_stats:
-    message: "Calculating alignment statistics and generating summary report"
-    input: expand("03_bam_files/{sample}ReadsPerGene.out.tab", sample=config["samples"])
-    output: "04_multiqc/integration_summary.csv"
-    log: "00_logs/alignment_stats.log"
-    shell: "python3 scripts/alignment_stats.py --output_file {output} 2> {log}" 
     
 #####################
 ## Quality Control ##
 #####################
 
-# To be compatible with the cluster I'm using, I had to install v1.14
 rule qc_report:
     message: "Generating QC reports"
     input:
@@ -199,4 +143,4 @@ rule gene_counts:
     input: expand("03_bam_files/{sample}_ReadsPerGene.out.tab", sample=config["samples"])
     output: "05_gene_counts/counts.txt"
     log: "00_logs/gene_counts.log"
-    shell: "python3 scripts/generate_counts.py --samples samples.yaml --bam_dir 03_bam_files --output {output} 2> {log}"   
+    shell: "python3 05.1_assign_gene_names.py > {output} 2> {log}"   
