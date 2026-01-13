@@ -87,6 +87,19 @@ rule zip_annot:
 ######################
 ## Read Preparation ##
 ######################
+
+rule trim:
+    message: "Trimming samples"
+    input:
+        r1 = "01_raw_sequences/{sample}_1.fq.gz",
+        r2 = "01_raw_sequences/{sample}_2.fq.gz",
+    output:
+        out1 = temp("02_trimmed/{sample}_1.fq.gz_trimming_report.txt"),
+        out2 = temp("02_trimmed/{sample}_1_val_1.fq.gz"),
+        out3 = temp("02_trimmed/{sample}_2.fq.gz_trimming_report.txt"),
+        out4 = temp("02_trimmed/{sample}_2_val_2.fq.gz")
+    log: "00_logs/02_trimmed_{sample}.log"
+    shell: "trim_galore --paired --cores 6 --2colour 20 --fastqc --clip_r1 10 --clip_r2 20 --three_prime_clip_r1 10 --three_prime_clip_r2 10 --output_dir 02_trimmed/ {input.r1} {input.r2} 2> {log}"
     
 rule align_reads:
     input:
