@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-python3 05.1_assign_gene_names.py
+python3 05.1_assign_gene_names.py --samples samples.yaml
 '''
 
 ####################
@@ -11,6 +11,28 @@ python3 05.1_assign_gene_names.py
 import os
 import subprocess
 import polars as pl
+import argparse
+import yaml
+
+#####################
+## Set Up Argparse ##
+#####################
+
+# Initialize argparse
+parser = argparse.ArgumentParser(
+    description = 'Generate gene count file')
+    
+parser.add_argument('--samples', required = True, type = str,
+    metavar = '<str>', help = 'Path to YAML file containing sample IDs')
+    
+parser.add_argument('--bam_dir', required = False, default = '03_bam_files', type = str,
+    metavar = '<str>', help = 'Directory containing STAR output files')
+
+parser.add_argument('--out_dir', required = False, default =  '05_gene_counts', type = str,
+    metavar = '<str>', help = 'Output directory to store gene count files')
+   
+# Finalization of argparse
+arg = parser.parse_args()
 
 ######################
 ## Define Functions ##
@@ -83,6 +105,60 @@ if not os.path.exists(hgnc_file):
     download_hgnc_genes(hgnc_file)
 else:
     print(f"{hgnc_file} already exists. Skipping download.")
+    
+#######################
+## Determine Samples ##
+#######################
+
+# Load config file
+with open(arg.samples, 'r') as file:
+    config_file = yaml.safe_load(file)
+
+# Access samples
+samples = config_file['samples']
+
+#########################
+## Process Gene Counts ##
+#########################
+
+gene_ids = None
+count_data = []
+
+for sample in samples:
+    # Input file path (STAR output)
+    input_file = os.path.join(arg.bam_dir, f"{sample}_ReadsPerGene.out.tab")
+    
+    # Read and process the file
+    with open(input_file, 'r') as infile:
+        # Skip first 4 lines
+        lines = infile.readlines()[4:]
+        
+        # Extract counts (4th column)
+        counts = [line.split('\t')[3].strip() for line in lines]
+        count_data.append(counts)
+        
+        # Extract gene IDs from first sample (assuming all files have same order)
+        if gene_ids is None:
+            gene_ids = [line.split('\t')[0].strip() for line in lines]
+
+##########################
+## Write Combined Output ##
+##########################
+
+# Create output directory if it doesn't exist
+output_dir = os.path.join(arg.out_dir)
+if output_dir:
+    os.makedirs(output_dir, exist_ok = True)
+
+# Write combined output
+with open(os.path.join(arg.out_dir, 'counts.txt'), 'w') as outfile:
+    # Write header
+    outfile.write('\t'.join(['gene_id'] + samples) + '\n')
+    
+    # Write each gene's counts
+    for i, gene_id in enumerate(gene_ids):
+        gene_counts = [count_data[j][i] for j in range(len(samples))]
+        outfile.write('\t'.join([gene_id] + gene_counts) + '\n')      
 
 #############################
 ## Map Ensembl IDs to HGNC ##
@@ -120,8 +196,8 @@ for i, (ensembl_id, hgnc_symbol) in enumerate(list(ensembl_to_hgnc.items())[:5])
 ###########################################
 
 # Define input and output file paths
-counts_file = "05_gene_counts/counts.txt"
-output_file = "05_gene_counts/hgnc_counts.txt"
+counts_file = os.path.join(arg.out_dir, "counts.txt")
+output_file = os.path.join(arg.out_dir, "hgnc_counts.txt")
 
 # Read the counts file
 print(f"Reading counts file: {counts_file}")

@@ -6,7 +6,6 @@ configfile: "samples.yaml"
 rule all:
     input:
         expand("03_bam_files/{sample}_Aligned.sortedByCoord.out.bam.bai", sample=config["samples"]),
-        "04_multiqc/integration_summary.csv",
         "04_multiqc/multiqc_report.html",
         "05_gene_counts/counts.txt"
 
@@ -156,4 +155,4 @@ rule gene_counts:
     input: expand("03_bam_files/{sample}_ReadsPerGene.out.tab", sample=config["samples"])
     output: "05_gene_counts/counts.txt"
     log: "00_logs/gene_counts.log"
-    shell: "python3 05.1_assign_gene_names.py > {output} 2> {log}"   
+    shell: "python3 05.1_assign_gene_names.py --samples samples.yaml 2> {log}"   
