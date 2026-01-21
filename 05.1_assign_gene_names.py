@@ -150,15 +150,34 @@ output_dir = os.path.join(arg.out_dir)
 if output_dir:
     os.makedirs(output_dir, exist_ok = True)
 
-# Write combined output
+# Write combined output with deduplication and summation
 with open(os.path.join(arg.out_dir, 'counts.txt'), 'w') as outfile:
     # Write header
     outfile.write('\t'.join(['gene_id'] + samples) + '\n')
     
-    # Write each gene's counts
+    # Create a dictionary to store summed counts for each gene ID (without version)
+    gene_dict = defaultdict(lambda: [0] * len(samples))
+    
+    # Process each gene
     for i, gene_id in enumerate(gene_ids):
-        gene_counts = [count_data[j][i] for j in range(len(samples))]
-        outfile.write('\t'.join([gene_id] + gene_counts) + '\n')      
+        # Remove version number from gene ID
+        base_gene_id = gene_id.split('.')[0]
+        
+        # Get counts for this gene across all samples
+        gene_counts = [int(count_data[j][i]) for j in range(len(samples))]
+        
+        # Sum with existing counts if this base gene ID already exists
+        existing_counts = gene_dict[base_gene_id]
+        summed_counts = [existing_counts[j] + gene_counts[j] for j in range(len(samples))]
+        gene_dict[base_gene_id] = summed_counts
+    
+    # Write deduplicated and summed counts
+    for base_gene_id, counts in gene_dict.items():
+        count_strs = [str(count) for count in counts]
+        outfile.write('\t'.join([base_gene_id] + count_strs) + '\n')
+
+print(f"Processed {len(gene_ids)} original entries")
+print(f"After deduplication: {len(gene_dict)} unique gene IDs")      
 
 #############################
 ## Map Ensembl IDs to HGNC ##
@@ -203,21 +222,31 @@ output_file = os.path.join(arg.out_dir, "hgnc_counts.txt")
 print(f"Reading counts file: {counts_file}")
 df = pl.read_csv(counts_file, separator="\t")
 
-# Get the first column name (should be "GeneID")
+# Get the first column name (should be "gene_id")
 geneid_col = df.columns[0]
+
+# Group by gene_id and sum duplicates (in case there are still duplicates after initial processing)
+df = df.group_by(geneid_col).agg([
+    pl.col(col).sum() for col in df.columns if col != geneid_col
+])
 
 # Replace Ensembl IDs with HGNC symbols using the mapping dictionary
 # For genes without a mapping, keep the original Ensembl ID
 df = df.with_columns(
     pl.col(geneid_col)
-    .str.split(".").list.first()
     .replace(ensembl_to_hgnc)
     .fill_null(pl.col(geneid_col))
     .alias(geneid_col)
 )
 
+# Group again in case HGNC mapping created duplicates (multiple Ensembl IDs mapping to same HGNC symbol)
+df = df.group_by(geneid_col).agg([
+    pl.col(col).sum() for col in df.columns if col != geneid_col
+])
+
 # Write the modified DataFrame to a new file
 print(f"Writing output file: {output_file}")
 df.write_csv(output_file, separator="\t")
 
-print("Gene symbol replacement completed successfully!")
+print(f"Gene symbol replacement completed successfully!")
+print(f"Final count: {len(df)} unique genes")
