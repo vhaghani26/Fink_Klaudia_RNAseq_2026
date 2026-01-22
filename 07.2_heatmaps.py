@@ -53,40 +53,40 @@ arg = parser.parse_args()
 gene_name = "MECP2"
 
 # Target these samples only
-target_samples = [    
-    'CO_R270X_B1_d18_A1',
-    'CO_R270X_B1_d18_A2',
-    'CO_R270X_B1_d18_A3',
-    'CO_R270X_B1_d18_D1',
-    'CO_R270X_B1_d18_D2',
-    'CO_R270X_B1_d18_D3',
-    'CO_R270X_B1_d46_A1',
-    'CO_R270X_B1_d46_A2',
-    'CO_R270X_B1_d46_A3',
-    'CO_R270X_B1_d46_D1',
-    'CO_R270X_B1_d46_D2',
-    'CO_R270X_B1_d46_D3',
-    'CO_R270X_B1_d90_A1',
-    'CO_R270X_B1_d90_A2',
-    'CO_R270X_B1_d90_A3',
-    'CO_R270X_B1_d90_D1',
-    'CO_R270X_B1_d90_D2',
-    'CO_R270X_B1_d90_D3',
-    'CO_R270X_B2_d18_A1',
-    'CO_R270X_B2_d18_A2',
-    'CO_R270X_B2_d18_A3',
-    'CO_R270X_B2_d18_D1',
-    'CO_R270X_B2_d18_D2',
-    'CO_R270X_B2_d18_D3',
-    'CO_R270X_B2_d46_A3',
-    'CO_R270X_B2_d46_D1',
-    'CO_R270X_B2_d46_D2',
-    'CO_R270X_B2_d90_A1',
-    'CO_R270X_B2_d90_A2',
-    'CO_R270X_B2_d90_A3',
-    'CO_R270X_B2_d90_D2',
-    'CO_R270X_B2_d90_D3'
-]
+target_samples = {   
+    'CO_R270X_B1_d18_A1': 'R270X_D18_1',
+    'CO_R270X_B1_d18_A2': 'R270X_D18_2',
+    'CO_R270X_B1_d18_A3': 'R270X_D18_3',
+    'CO_R270X_B2_d18_A1': 'R270X_D18_4',
+    'CO_R270X_B2_d18_A2': 'R270X_D18_5',
+    'CO_R270X_B2_d18_A3': 'R270X_D18_6',
+    'CO_R270X_B1_d46_A1': 'R270X_D46_1',
+    'CO_R270X_B1_d46_A2': 'R270X_D46_2',
+    'CO_R270X_B1_d46_A3': 'R270X_D46_3',
+    'CO_R270X_B2_d46_A3': 'R270X_D46_4',
+    'CO_R270X_B1_d90_A1': 'R270X_D90_1',
+    'CO_R270X_B1_d90_A2': 'R270X_D90_2',
+    'CO_R270X_B1_d90_A3': 'R270X_D90_3',
+    'CO_R270X_B2_d90_A1': 'R270X_D90_4',
+    'CO_R270X_B2_d90_A2': 'R270X_D90_5',
+    'CO_R270X_B2_d90_A3': 'R270X_D90_6',
+    'CO_R270X_B1_d18_D1': 'WT_D18_1',
+    'CO_R270X_B1_d18_D2': 'WT_D18_2',
+    'CO_R270X_B1_d18_D3': 'WT_D18_3',
+    'CO_R270X_B2_d18_D1': 'WT_D18_4',
+    'CO_R270X_B2_d18_D2': 'WT_D18_5',
+    'CO_R270X_B2_d18_D3': 'WT_D18_6',
+    'CO_R270X_B1_d46_D1': 'WT_D46_1',
+    'CO_R270X_B1_d46_D2': 'WT_D46_2',
+    'CO_R270X_B1_d46_D3': 'WT_D46_3',
+    'CO_R270X_B2_d46_D1': 'WT_D46_4',
+    'CO_R270X_B2_d46_D2': 'WT_D46_5',
+    'CO_R270X_B1_d90_D1': 'WT_D90_1',
+    'CO_R270X_B1_d90_D2': 'WT_D90_2',
+    'CO_R270X_B1_d90_D3': 'WT_D90_3',
+    'CO_R270X_B2_d90_D2': 'WT_D90_4',
+    'CO_R270X_B2_d90_D3': 'WT_D90_5'
+}
 
 
 # Define genes of interest (sent by Klaudia)
@@ -153,7 +153,7 @@ df = df.rename(rename_mapping)
 df = df.slice(1)
 
 # Filter columns to keep only gene column and target samples
-columns_to_keep = ['gene'] + [col for col in df.columns if col in target_samples]
+columns_to_keep = ['gene'] + [col for col in df.columns if col in target_samples.keys()]
 df = df.select(columns_to_keep)
 
 # Calculate remaining data
@@ -167,6 +167,9 @@ for col in numeric_columns:
 
 # Convert to pandas and set index
 data = df.to_pandas().set_index('gene')
+
+# Rename columns using the dictionary
+data.columns = [target_samples.get(col, col) for col in data.columns]
 
 # Replace non-finite values with 0
 data = data.fillna(0).replace([np.inf, -np.inf], 0)
@@ -278,6 +281,9 @@ for col in numeric_columns:
 
 # Convert to pandas and set index
 data = df.to_pandas().set_index('gene')
+
+# Rename columns using the dictionary
+data.columns = [target_samples.get(col, col) for col in data.columns]
 
 # Replace non-finite values with 0
 data = data.fillna(0).replace([np.inf, -np.inf], 0)
@@ -819,6 +825,9 @@ for col in numeric_columns:
 
 # Convert to pandas and set index
 data = df.to_pandas().set_index('gene')
+
+# Rename columns using the dictionary
+data.columns = [target_samples.get(col, col) for col in data.columns]
 
 # Replace non-finite values with 0
 data = data.fillna(0).replace([np.inf, -np.inf], 0)
