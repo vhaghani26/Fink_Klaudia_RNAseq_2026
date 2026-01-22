@@ -21,3 +21,4 @@ Box_Plot/*.txt
 01_raw_sequences/
 02_trimmed/
 05_gene_counts/
+NEED_TO_RUN/
