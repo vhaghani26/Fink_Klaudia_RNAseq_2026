@@ -187,7 +187,7 @@ with open(hgnc_file, 'r') as f:
                     # Split by '|' first, then take the part before the first dot
                     if '|' in ensembl_transcript_field:
                         # Take the part before the first '|'
-                        transcript_part = ensembl_transcript_field.split('|')[0]
+                        transcript_part = ensembl_transcript_field.strip('"').split('|')[0]
                         # Extract just the transcript ID without version
                         transcript_base = transcript_part.split('.')[0]
                     else:
@@ -206,13 +206,33 @@ print(f"Mapped {len(hgnc_to_ensembl)} HGNC symbols to Ensembl IDs and transcript
 
 # View sample mappings for confirmation
 print("Sample gene mappings (first 10):")
-for i, (hgnc_symbol, ensembl_data) in enumerate(list(hgnc_to_ensembl.items())[:100]):
+for i, (hgnc_symbol, ensembl_data) in enumerate(list(hgnc_to_ensembl.items())[:10]):
     print(f"  {hgnc_symbol} -> [{ensembl_data[0]}, {ensembl_data[1]}]")
     
-'''
-#######################
+#############################
+## Create Reverse Mappings ##
+#############################
+
+# Create reverse mapping: ensembl_gene_id -> hgnc_symbol and ensembl transcript -> hgnc_symbol
+ensembl_gene_to_hgnc = {}
+ensembl_transcript_to_hgnc = {}
+
+for hgnc_symbol, ensembl_data in hgnc_to_ensembl.items():
+    gene_id_base = ensembl_data[0]
+    transcript_base = ensembl_data[1]
+    
+    if gene_id_base != "NA":
+        ensembl_gene_to_hgnc[gene_id_base] = hgnc_symbol
+    
+    if transcript_base != "NA":
+        ensembl_transcript_to_hgnc[transcript_base] = hgnc_symbol
+
+print(f"Created {len(ensembl_gene_to_hgnc)} Ensembl gene ID -> HGNC mappings")
+print(f"Created {len(ensembl_transcript_to_hgnc)} Ensembl transcript -> HGNC mappings")
+
+######################
 ## Read Counts File ##
-#######################
+######################
 
 print(f"\nReading counts from: {arg.counts_file}")
 
@@ -246,8 +266,6 @@ with open(arg.counts_file, 'r') as f:
             # Map transcript ID to gene ID
             gene_id = transcript_to_gene.get(transcript_id, transcript_id)
             
-            print(gene_id)
-            
             # If we already have counts for this gene, sum them
             if gene_id in gene_counts_dict:
                 existing_counts = gene_counts_dict[gene_id]
@@ -256,11 +274,6 @@ with open(arg.counts_file, 'r') as f:
             else:
                 gene_counts_dict[gene_id] = counts
             
-            line_count += 1
-            if line_count % 100000 == 0:
-                print(f"  Processed {line_count} lines...")
-
-print(f"Processed {line_count} transcript entries")
 print(f"Collapsed into {len(gene_counts_dict)} unique genes")
 
 ###########################################
@@ -274,7 +287,7 @@ if arg.out_dir:
 # Output file path
 hgnc_counts_file = os.path.join(arg.out_dir, 'hgnc_counts.txt')
 
-# Now map to HGNC symbols
+# Map to HGNC symbols
 print(f"\nMapping Ensembl Gene IDs to HGNC symbols...")
 
 # Create lists for final output
@@ -283,8 +296,12 @@ unmapped_genes = []
 multimapped_genes = defaultdict(list)
 
 for gene_id, counts in gene_counts_dict.items():
-    # Get HGNC symbol
+    # Try to get HGNC symbol from gene ID first
     hgnc_symbol = ensembl_gene_to_hgnc.get(gene_id)
+    
+    # If not found, try transcript mapping
+    if not hgnc_symbol:
+        hgnc_symbol = ensembl_transcript_to_hgnc.get(gene_id)
     
     if hgnc_symbol:
         # Check if multiple gene IDs map to same HGNC symbol
@@ -295,11 +312,11 @@ for gene_id, counts in gene_counts_dict.items():
                 final_counts_dict[hgnc_symbol][i] += counts[i]
         else:
             # First time seeing this HGNC symbol
-            final_counts_dict[hgnc_symbol] = counts[:]  # Copy counts
+            final_counts_dict[hgnc_symbol] = counts[:]
     else:
         # Keep original gene ID for unmapped genes
         unmapped_genes.append(gene_id)
-        final_counts_dict[gene_id] = counts[:]  # Copy counts
+        final_counts_dict[gene_id] = counts[:]
 
 print(f"Mapped {len(gene_counts_dict) - len(unmapped_genes)} genes to HGNC symbols")
 print(f"{len(unmapped_genes)} genes could not be mapped to HGNC symbols")
@@ -337,4 +354,3 @@ print(f"Final unique gene symbols: {len(final_counts_dict)}")
 print(f"Successfully mapped to HGNC: {len(gene_counts_dict) - len(unmapped_genes)}")
 print(f"Keeping original ID: {len(unmapped_genes)}")
 print(f"Output file: {hgnc_counts_file}")
-'''
