@@ -53,16 +53,64 @@ arg = parser.parse_args()
 gene_name = "MECP2"
 
 # Target these samples only
-target_samples = ["2043_A_MECP2_R270X_CtO_D18_1", "2043_A_MECP2_R270X_CtO_D18_2", "2043_A_MECP2_R270X_CtO_D46_1", "2043_A_MECP2_R270X_CtO_D46_2", "2043_A_MECP2_R270X_CtO_D46_3", "2043_D_MECP2_WT_CtO_D18_1", "2043_D_MECP2_WT_CtO_D46_1", "2043_D_MECP2_WT_CtO_D46_2", "2043_D_MECP2_WT_CtO_D46_3", "80230F_CtOD111_1", "80230F_CtOD111_2", "80230F_CtOD111_3", "GM27437_MECP2_1155del32_CtOD111_1", "GM27437_MECP2_1155del32_CtOD111_2", "GM27437_MECP2_1155del32_CtOD111_3", "R270X_pA_ORG_d90_N1", "R270X_pA_ORG_d90_N2", "R270X_pA_ORG_d90_N3", "R270X_pD_ORG_d90_N1", "R270X_pD_ORG_d90_N2", "R270X_pD_ORG_d90_N3"]
+target_samples = [    
+    'CO_R270X_B1_d18_A1',
+    'CO_R270X_B1_d18_A2',
+    'CO_R270X_B1_d18_A3',
+    'CO_R270X_B1_d18_D1',
+    'CO_R270X_B1_d18_D2',
+    'CO_R270X_B1_d18_D3',
+    'CO_R270X_B1_d46_A1',
+    'CO_R270X_B1_d46_A2',
+    'CO_R270X_B1_d46_A3',
+    'CO_R270X_B1_d46_D1',
+    'CO_R270X_B1_d46_D2',
+    'CO_R270X_B1_d46_D3',
+    'CO_R270X_B1_d90_A1',
+    'CO_R270X_B1_d90_A2',
+    'CO_R270X_B1_d90_A3',
+    'CO_R270X_B1_d90_D1',
+    'CO_R270X_B1_d90_D2',
+    'CO_R270X_B1_d90_D3',
+    'CO_R270X_B2_d18_A1',
+    'CO_R270X_B2_d18_A2',
+    'CO_R270X_B2_d18_A3',
+    'CO_R270X_B2_d18_D1',
+    'CO_R270X_B2_d18_D2',
+    'CO_R270X_B2_d18_D3',
+    'CO_R270X_B2_d46_A3',
+    'CO_R270X_B2_d46_D1',
+    'CO_R270X_B2_d46_D2',
+    'CO_R270X_B2_d90_A1',
+    'CO_R270X_B2_d90_A2',
+    'CO_R270X_B2_d90_A3',
+    'CO_R270X_B2_d90_D2',
+    'CO_R270X_B2_d90_D3'
+]
+
 
 # Define genes of interest (sent by Klaudia)
-genes_of_interest = ["GAD1", "GAD2", "SLC6A1", "CAMK2A", "SYN1", "BDNF", "CRH", "RELN", "EGR2", "ARC"]
+genes_of_interest = ["MECP2", "GAD1", "GAD2", "SLC6A1", "CAMK2A", "SYN1", "BDNF", "CRH", "RELN", "EGR2", "ARC", "PAX6", "MAP2", "NEUN", "ND", "SN2", "FOXG1", "GLUT2", "GNB1", "DYNAMIN", "CRMP1", "CLUSTERIN"]
 
 # Remove possible duplicates in genes of interest
 genes_of_interest = list(dict.fromkeys(genes_of_interest))
 
 # DEG groups of interest
-groups_of_interest = ["MECP2_R270X_CtO_D18", "MECP2_R270X_CtO_D46", "MECP2_WT_CtO_D18", "MECP2_WT_CtO_D46", "X80230F_WT_CtO_D111", "MECP2_1155del32_CtO_D111", "MECP2_R270X_pA_CtO_D90"]
+groups_of_interest = [
+    "R270X_D18",
+    "WT_D18",
+    "R270X_D46",
+    "WT_D46",
+    "R270X_D90",
+    "WT_D90",
+    "R270X_D18",
+    "WT_D18",
+    "R270X_D46",
+    "WT_D46",
+    "R270X_D90",
+    "WT_D90"
+]
+
 
 # DEG results files
 deg_files = []
