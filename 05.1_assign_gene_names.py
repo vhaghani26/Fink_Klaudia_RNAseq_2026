@@ -23,6 +23,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--counts_file', required = True, type = str,
     metavar = '<str>', help = 'Path to counts.txt file with transcript IDs')
 
+parser.add_argument('--mapping_file', required = False, default = 'gene_name_mapping.csv', type = str,
+    metavar = '<str>', help = 'Path to CSV mapping file (Ensembl_Gene_ID, Ensembl_Transcript_ID, HGNC_Symbol)')
+
 parser.add_argument('--out_dir', required = False, default = '05_gene_counts', type = str,
     metavar = '<str>', help = 'Output directory to store gene count files')
    
@@ -30,205 +33,66 @@ parser.add_argument('--out_dir', required = False, default = '05_gene_counts', t
 arg = parser.parse_args()
 
 ######################
-## Define Functions ##
+## Read Mapping File ##
 ######################
 
-def download_hgnc_genes(output):
-    url = "https://storage.googleapis.com/public-download-files/hgnc/tsv/tsv/hgnc_complete_set.txt"
-    try:
-        print("Starting download of HGNC gene IDs...")
-        subprocess.run(["wget", url, "-O", output], check=True)
-        print("Download completed successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error downloading HGNC gene IDs: {e}")
+print(f"Reading mapping file: {arg.mapping_file}")
 
-def download_ensembl_gtf(output_gz):
-    """Download Ensembl GTF file"""
-    # Using Ensembl GRCh38 GTF - this has proper transcript to gene mappings
-    url = "https://ftp.ensembl.org/pub/release-110/gtf/homo_sapiens/Homo_sapiens.GRCh38.110.gtf.gz"
-    try:
-        print("Starting download of Ensembl GTF file...")
-        subprocess.run(["wget", url, "-O", output_gz], check=True)
-        print("Download completed successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error downloading Ensembl GTF file: {e}")
+# Create mappings
+gene_to_hgnc = {}  # Ensembl_Gene_ID -> HGNC_Symbol
+transcript_to_hgnc = {}  # Ensembl_Transcript_ID -> HGNC_Symbol
+transcript_to_gene = {}  # Ensembl_Transcript_ID -> Ensembl_Gene_ID
 
-def unzip_file(input_file):
-    try:
-        print(f"Unzipping {input_file}...")
-        subprocess.run(["gunzip", "-f", input_file], check=True)
-        print(f"Unzipped file created: {input_file[:-3]}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error unzipping the file: {e}")
+if not os.path.exists(arg.mapping_file):
+    print(f"ERROR: Mapping file not found: {arg.mapping_file}")
+    print("Please create a CSV file with columns: Ensembl_Gene_ID, Ensembl_Transcript_ID, HGNC_Symbol")
+    exit(1)
 
-############################
-## Download Ensembl GTF  ##
-############################
-
-# Define file paths for Ensembl GTF
-ensembl_gz_file = "01_Genomes/hg38/ensembl.gtf.gz"
-ensembl_gtf_file = "01_Genomes/hg38/ensembl.gtf"
-
-# Ensure the output directory exists
-os.makedirs(os.path.dirname(ensembl_gz_file), exist_ok=True)
-
-# Check if the Ensembl GTF file already exists
-if not os.path.exists(ensembl_gz_file) and not os.path.exists(ensembl_gtf_file):
-    print("Downloading Ensembl GTF file for transcript-gene mapping...")
-    download_ensembl_gtf(ensembl_gz_file)
-elif os.path.exists(ensembl_gtf_file):
-    print(f"{ensembl_gtf_file} already exists. Skipping download.")
-else:
-    print(f"{ensembl_gz_file} already exists.")
-
-# Check if the unzipped GTF file already exists
-if not os.path.exists(ensembl_gtf_file) and os.path.exists(ensembl_gz_file):
-    unzip_file(ensembl_gz_file)
-elif os.path.exists(ensembl_gtf_file):
-    print(f"{ensembl_gtf_file} already exists. Skipping unzipping.")
-
-############################
-## Download HGNC Gene IDs ##
-############################
-
-# Define file path 
-hgnc_file = "01_Genomes/hg38/hgnc_complete_set.txt"
-
-# Ensure the output directory exists
-os.makedirs(os.path.dirname(hgnc_file), exist_ok = True)
-
-# Check if the HGNC file already exists and download if not
-if not os.path.exists(hgnc_file):
-    print(f"{hgnc_file} not found. Downloading...")
-    download_hgnc_genes(hgnc_file)
-else:
-    print(f"Using existing HGNC file: {hgnc_file}")
-
-#########################################
-## Create Transcript to Gene Mapping   ##
-#########################################
-
-print("\nCreating transcript to gene mapping from Ensembl GTF...")
-
-transcript_to_gene = {}
-gene_to_transcripts = defaultdict(list)
-
-if os.path.exists(ensembl_gtf_file):
-    with open(ensembl_gtf_file, 'r') as f:
-        for line in f:
-            if line.startswith('#'):
-                continue
-            parts = line.strip().split('\t')
-            if len(parts) >= 9 and parts[2] == "transcript":
-                # Parse the attributes field
-                attrs = parts[8]
-                gene_id = None
-                transcript_id = None
-                
-                # Look for gene_id and transcript_id in attributes
-                for attr in attrs.split(';'):
-                    attr = attr.strip()
-                    if attr.startswith('gene_id'):
-                        gene_id = attr.split('"')[1] if '"' in attr else attr.split()[1]
-                    elif attr.startswith('transcript_id'):
-                        transcript_id = attr.split('"')[1] if '"' in attr else attr.split()[1]
-                
-                if gene_id and transcript_id:
-                    # Remove version numbers if present
-                    gene_id_base = gene_id.split('.')[0]
-                    transcript_id_base = transcript_id.split('.')[0]
-                    
-                    transcript_to_gene[transcript_id_base] = gene_id_base
-                    gene_to_transcripts[gene_id_base].append(transcript_id_base)
+with open(arg.mapping_file, 'r') as f:
+    # Check if header exists
+    first_line = f.readline().strip()
     
-    print(f"Loaded {len(transcript_to_gene)} transcript-to-gene mappings")
-    print(f"Example mappings (first 5):")
-    for i, (transcript, gene) in enumerate(list(transcript_to_gene.items())[:5]):
-        print(f"  {transcript} -> {gene}")
-else:
-    print(f"WARNING: {ensembl_gtf_file} not found. Will try to map directly using transcript IDs.")
-
-#############################
-## Map Ensembl IDs to HGNC ##
-#############################
-
-print("\nCreating HGNC symbol to Ensembl ID/Transcript mapping dictionary...")
-
-# Create dictionary from HGNC file with structure: hgnc_symbol: [ensembl_id, ensembl_transcript]
-hgnc_to_ensembl = {}
-with open(hgnc_file, 'r') as f:
-    next(f)  # Skip header
+    # If first line doesn't look like header (no Ensembl_Gene_ID), rewind
+    if not first_line.startswith("Ensembl_Gene_ID"):
+        f.seek(0)  # Go back to beginning of file
+        has_header = False
+    else:
+        has_header = True
+    
+    line_count = 0
     for line in f:
-        parts = line.strip().split('\t')
-        
-        # The ensembl_gene_id is in column 18 (index 18, 0-indexed)
-        # The symbol is in column 1 (index 1, 0-indexed)
-        # The transcript is in column 52 (index 52, 0-indexed)
-        if len(parts) > 52:
-            hgnc_symbol = parts[1].strip()
+        parts = line.strip().split(',')
+        if len(parts) >= 3:
+            ensembl_gene = parts[0].strip()
+            ensembl_transcript = parts[1].strip()
+            hgnc_symbol = parts[2].strip()
             
-            # Only proceed if we have an HGNC symbol
-            if hgnc_symbol:
-                # Get Ensembl gene ID from column 19
-                ensembl_gene_id = parts[19].strip()
-                # Get Ensembl transcript from column 52
-                ensembl_transcript_field = parts[52].strip()
-                
-                # Process Ensembl gene ID (or set to NA)
-                if ensembl_gene_id and ensembl_gene_id != "ensembl_gene_id":
-                    # Remove version number from Ensembl Gene ID for matching
-                    gene_id_base = ensembl_gene_id.split('.')[0]
-                else:
-                    gene_id_base = "NA"
-                
-                # Process Ensembl transcript (or set to NA)
-                if ensembl_transcript_field:
-                    # Extract transcript from column 52 - format: {transcript}.v|stuff
-                    # Split by '|' first, then take the part before the first dot
-                    if '|' in ensembl_transcript_field:
-                        # Take the part before the first '|'
-                        transcript_part = ensembl_transcript_field.strip('"').split('|')[0]
-                        # Extract just the transcript ID without version
-                        transcript_base = transcript_part.split('.')[0]
-                    else:
-                        # If no '|', just split by dot
-                        transcript_base = ensembl_transcript_field.split('.')[0]
-                else:
-                    transcript_base = "NA"
-                
-                # Only store if we have at least one valid Ensembl ID (not both NA)
-                if gene_id_base != "NA" or transcript_base != "NA":
-                    # Store in dictionary: hgnc_symbol -> [ensembl_id, ensembl_transcript]
-                    hgnc_to_ensembl[hgnc_symbol] = [gene_id_base, transcript_base]
-                # Optionally, you could also store entries with both as NA by removing the if condition above
+            # Remove version numbers if present
+            ensembl_gene_base = ensembl_gene.split('.')[0]
+            ensembl_transcript_base = ensembl_transcript.split('.')[0]
+            
+            # Store mappings
+            if ensembl_gene_base and hgnc_symbol:
+                gene_to_hgnc[ensembl_gene_base] = hgnc_symbol
+            
+            if ensembl_transcript_base and hgnc_symbol:
+                transcript_to_hgnc[ensembl_transcript_base] = hgnc_symbol
+            
+            if ensembl_transcript_base and ensembl_gene_base:
+                transcript_to_gene[ensembl_transcript_base] = ensembl_gene_base
+            
+            line_count += 1
 
-print(f"Mapped {len(hgnc_to_ensembl)} HGNC symbols to Ensembl IDs and transcripts")
+print(f"Loaded {line_count} mappings from CSV file")
+print(f"  - {len(gene_to_hgnc)} Ensembl Gene ID -> HGNC mappings")
+print(f"  - {len(transcript_to_hgnc)} Ensembl Transcript ID -> HGNC mappings")
+print(f"  - {len(transcript_to_gene)} Ensembl Transcript ID -> Ensembl Gene ID mappings")
 
-# View sample mappings for confirmation
-print("Sample gene mappings (first 10):")
-for i, (hgnc_symbol, ensembl_data) in enumerate(list(hgnc_to_ensembl.items())[:10]):
-    print(f"  {hgnc_symbol} -> [{ensembl_data[0]}, {ensembl_data[1]}]")
-    
-#############################
-## Create Reverse Mappings ##
-#############################
-
-# Create reverse mapping: ensembl_gene_id -> hgnc_symbol and ensembl transcript -> hgnc_symbol
-ensembl_gene_to_hgnc = {}
-ensembl_transcript_to_hgnc = {}
-
-for hgnc_symbol, ensembl_data in hgnc_to_ensembl.items():
-    gene_id_base = ensembl_data[0]
-    transcript_base = ensembl_data[1]
-    
-    if gene_id_base != "NA":
-        ensembl_gene_to_hgnc[gene_id_base] = hgnc_symbol
-    
-    if transcript_base != "NA":
-        ensembl_transcript_to_hgnc[transcript_base] = hgnc_symbol
-
-print(f"Created {len(ensembl_gene_to_hgnc)} Ensembl gene ID -> HGNC mappings")
-print(f"Created {len(ensembl_transcript_to_hgnc)} Ensembl transcript -> HGNC mappings")
+# Show some examples
+print("\nSample mappings:")
+sample_genes = list(gene_to_hgnc.items())[:5]
+for gene, symbol in sample_genes:
+    print(f"  {gene} -> {symbol}")
 
 ######################
 ## Read Counts File ##
@@ -241,7 +105,7 @@ if not os.path.exists(arg.counts_file):
     exit(1)
 
 # Read the counts file
-gene_counts_dict = {}
+counts_data = {}
 samples = []
 
 with open(arg.counts_file, 'r') as f:
@@ -255,26 +119,19 @@ with open(arg.counts_file, 'r') as f:
     for line in f:
         parts = line.strip().split('\t')
         if len(parts) == len(header):
-            transcript_id_full = parts[0].strip()
+            feature_id_full = parts[0].strip()
             
-            # Remove version number from transcript ID
-            transcript_id = transcript_id_full.split('.')[0]
+            # Remove version number from ID
+            feature_id = feature_id_full.split('.')[0]
             
             # Convert counts to integers
             counts = [int(x) for x in parts[1:]]
             
-            # Map transcript ID to gene ID
-            gene_id = transcript_to_gene.get(transcript_id, transcript_id)
-            
-            # If we already have counts for this gene, sum them
-            if gene_id in gene_counts_dict:
-                existing_counts = gene_counts_dict[gene_id]
-                # Sum counts for each sample
-                gene_counts_dict[gene_id] = [existing_counts[i] + counts[i] for i in range(len(counts))]
-            else:
-                gene_counts_dict[gene_id] = counts
-            
-print(f"Collapsed into {len(gene_counts_dict)} unique genes")
+            # Store the data
+            counts_data[feature_id] = counts
+            line_count += 1
+
+print(f"Read {line_count} entries from counts file")
 
 ###########################################
 ## Map to HGNC Symbols and Create Output ##
@@ -287,51 +144,79 @@ if arg.out_dir:
 # Output file path
 hgnc_counts_file = os.path.join(arg.out_dir, 'hgnc_counts.txt')
 
-# Map to HGNC symbols
-print(f"\nMapping Ensembl Gene IDs to HGNC symbols...")
+# Process counts and map to HGNC symbols
+print(f"\nMapping feature IDs to HGNC symbols...")
 
-# Create lists for final output
-final_counts_dict = defaultdict(lambda: [0] * len(samples))
-unmapped_genes = []
-multimapped_genes = defaultdict(list)
+# Create dictionary for final counts
+final_counts = defaultdict(lambda: [0] * len(samples))
 
-for gene_id, counts in gene_counts_dict.items():
-    # Try to get HGNC symbol from gene ID first
-    hgnc_symbol = ensembl_gene_to_hgnc.get(gene_id)
+# Track statistics
+stats = {
+    'mapped_via_gene': 0,
+    'mapped_via_transcript': 0,
+    'unmapped': 0,
+    'multimapped': 0
+}
+
+unmapped_features = []
+multimapped_symbols = defaultdict(list)
+
+for feature_id, counts in counts_data.items():
+    hgnc_symbol = None
     
-    # If not found, try transcript mapping
-    if not hgnc_symbol:
-        hgnc_symbol = ensembl_transcript_to_hgnc.get(gene_id)
-    
-    if hgnc_symbol:
-        # Check if multiple gene IDs map to same HGNC symbol
-        if hgnc_symbol in final_counts_dict:
-            multimapped_genes[hgnc_symbol].append(gene_id)
-            # Sum counts for genes that map to the same HGNC symbol
-            for i in range(len(samples)):
-                final_counts_dict[hgnc_symbol][i] += counts[i]
+    # Check what type of ID we have
+    if feature_id.startswith('ENSG'):  # Gene ID
+        # Try direct gene mapping
+        hgnc_symbol = gene_to_hgnc.get(feature_id)
+        if hgnc_symbol:
+            stats['mapped_via_gene'] += 1
+    elif feature_id.startswith('ENST'):  # Transcript ID
+        # Try direct transcript mapping
+        hgnc_symbol = transcript_to_hgnc.get(feature_id)
+        if hgnc_symbol:
+            stats['mapped_via_transcript'] += 1
         else:
-            # First time seeing this HGNC symbol
-            final_counts_dict[hgnc_symbol] = counts[:]
+            # If no direct transcript mapping, try to get gene ID first
+            gene_id = transcript_to_gene.get(feature_id)
+            if gene_id:
+                hgnc_symbol = gene_to_hgnc.get(gene_id)
+                if hgnc_symbol:
+                    stats['mapped_via_gene'] += 1
+    
+    # If still no symbol found
+    if not hgnc_symbol:
+        # Keep original ID for unmapped features
+        hgnc_symbol = feature_id
+        unmapped_features.append(feature_id)
+        stats['unmapped'] += 1
+    
+    # Check if multiple features map to same HGNC symbol
+    if hgnc_symbol in final_counts:
+        multimapped_symbols[hgnc_symbol].append(feature_id)
+        stats['multimapped'] += 1
+        # Sum counts for features that map to the same HGNC symbol
+        for i in range(len(samples)):
+            final_counts[hgnc_symbol][i] += counts[i]
     else:
-        # Keep original gene ID for unmapped genes
-        unmapped_genes.append(gene_id)
-        final_counts_dict[gene_id] = counts[:]
+        # First time seeing this HGNC symbol
+        final_counts[hgnc_symbol] = counts[:]
 
-print(f"Mapped {len(gene_counts_dict) - len(unmapped_genes)} genes to HGNC symbols")
-print(f"{len(unmapped_genes)} genes could not be mapped to HGNC symbols")
-if multimapped_genes:
-    print(f"{len(multimapped_genes)} HGNC symbols have multiple gene IDs mapping to them")
+print(f"\nMapping Statistics:")
+print(f"  Mapped via gene ID: {stats['mapped_via_gene']}")
+print(f"  Mapped via transcript ID: {stats['mapped_via_transcript']}")
+print(f"  Unmapped (kept original ID): {stats['unmapped']}")
+print(f"  Multi-mapped to same symbol: {stats['multimapped']}")
+print(f"  Final unique symbols: {len(final_counts)}")
 
-if unmapped_genes:
-    print("First 10 unmapped gene IDs:")
-    for gene_id in unmapped_genes[:10]:
-        print(f"  {gene_id}")
+if unmapped_features:
+    print(f"\nFirst 10 unmapped feature IDs:")
+    for feature_id in unmapped_features[:10]:
+        print(f"  {feature_id}")
 
-if multimapped_genes:
-    print("\nFirst 5 HGNC symbols with multiple gene IDs:")
-    for i, (hgnc_symbol, gene_ids) in enumerate(list(multimapped_genes.items())[:5]):
-        print(f"  {hgnc_symbol}: {', '.join(gene_ids[:3])}{'...' if len(gene_ids) > 3 else ''}")
+if multimapped_symbols:
+    print(f"\nFirst 5 HGNC symbols with multiple feature IDs:")
+    for i, (symbol, features) in enumerate(list(multimapped_symbols.items())[:5]):
+        print(f"  {symbol}: {', '.join(features[:3])}{'...' if len(features) > 3 else ''}")
 
 # Write final output with HGNC symbols
 print(f"\nWriting final HGNC-mapped counts file: {hgnc_counts_file}")
@@ -340,17 +225,14 @@ with open(hgnc_counts_file, 'w') as outfile:
     outfile.write('\t'.join(['gene_symbol'] + samples) + '\n')
     
     # Sort by gene symbol for readability
-    sorted_genes = sorted(final_counts_dict.keys())
+    sorted_symbols = sorted(final_counts.keys())
     
-    for gene_symbol in sorted_genes:
-        counts = final_counts_dict[gene_symbol]
+    for gene_symbol in sorted_symbols:
+        counts = final_counts[gene_symbol]
         count_strs = [str(count) for count in counts]
         outfile.write('\t'.join([gene_symbol] + count_strs) + '\n')
 
 print(f"\n--- Conversion Complete ---")
-print(f"Original transcript entries: {line_count}")
-print(f"Unique Ensembl Gene IDs: {len(gene_counts_dict)}")
-print(f"Final unique gene symbols: {len(final_counts_dict)}")
-print(f"Successfully mapped to HGNC: {len(gene_counts_dict) - len(unmapped_genes)}")
-print(f"Keeping original ID: {len(unmapped_genes)}")
+print(f"Original entries: {line_count}")
+print(f"Final unique gene symbols: {len(final_counts)}")
 print(f"Output file: {hgnc_counts_file}")
