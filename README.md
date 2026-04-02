@@ -61,7 +61,7 @@ Gene count files were read in using [`05.1_assign_gene_names.py`](https://github
 
 ## 3. Weighted Gene Co-expression Network Analysis (WGCNA)
 
-WGCNA was conducted in `08_WGCNA.ipynb`, with module-trait associations and GO enrichment analyzed in `09_WGCNA_GO.ipynb`.
+WGCNA was conducted in [`08_WGCNA.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/08_WGCNA.ipynb), with module-trait associations and GO enrichment analyzed in [`09_WGCNA_GO.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/09_WGCNA_GO.ipynb).
 
 ## 4. Visualization of Results
 
