@@ -22,3 +22,4 @@ Box_Plot/*.txt
 02_trimmed/
 05_gene_counts/
 NEED_TO_RUN/
+gene_name_mapping.csv
