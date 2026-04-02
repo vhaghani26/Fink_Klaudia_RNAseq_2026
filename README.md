@@ -67,7 +67,7 @@ WGCNA was conducted in `08_WGCNA.ipynb`, with module-trait associations and GO e
 
 Multiple visualization techniques were used. Below are the scripts for different types of plots/visualizations:
 
-- [`07.1_Visualize_DEG.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/07.1_Visualize_DEG.ipynb): DEG volcano plots, MA plots
+- [`07.1_Visualize_DEG.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/07.1_Visualize_DEG.ipynb): DEG volcano plots, GO plots
 - [`07.2_heatmaps.py`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/07.2_heatmaps.py): Z-score normalized heatmaps with hierarchical clustering
 - [`10_Visualize_WGCNA.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/10_Visualize_WGCNA.ipynb): Module eigengene plots
 - [`11_WGCNA_Heatmap.ipynb`](https://github.com/vhaghani26/Fink_Klaudia_RNAseq_2026/blob/main/11_WGCNA_Heatmap.ipynb): Module-trait relationship heatmaps
